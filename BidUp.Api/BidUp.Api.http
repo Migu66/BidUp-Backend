@@ -1,0 +1,6 @@
+@BidUp.Api_HostAddress = http://localhost:5240
+
+GET {{BidUp.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
