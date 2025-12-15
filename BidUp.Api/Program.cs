@@ -1,8 +1,36 @@
 var builder = WebApplication.CreateBuilder(args);
 
+// Load environment variables
+var dotenv = Path.Combine(Directory.GetCurrentDirectory(), ".env");
+if (File.Exists(dotenv))
+{
+	var lines = File.ReadAllLines(dotenv);
+	foreach (var line in lines)
+	{
+		if (!string.IsNullOrWhiteSpace(line) && !line.StartsWith("#"))
+		{
+			var parts = line.Split('=', 2);
+			if (parts.Length == 2)
+			{
+				Environment.SetEnvironmentVariable(parts[0], parts[1]);
+			}
+		}
+	}
+}
+
 // Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
+
+// Get connection string from environment variables or appsettings
+var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__DefaultConnection")
+	?? builder.Configuration.GetConnectionString("DefaultConnection");
+var jwtSecret = Environment.GetEnvironmentVariable("Jwt__SecretKey")
+	?? builder.Configuration["Jwt:SecretKey"];
+
+if (string.IsNullOrEmpty(connectionString))
+{
+	Console.WriteLine("⚠️ WARNING: ConnectionString not configured. Using Development defaults.");
+}
 
 var app = builder.Build();
 
