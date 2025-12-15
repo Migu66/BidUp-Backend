@@ -1,0 +1,78 @@
+root = true
+
+# C# files
+[*.cs]
+indent_style = space
+indent_size = 4
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Code style rules
+csharp_style_namespace_declarations = file_scoped:silent
+csharp_style_var_for_built_in_types = false:silent
+csharp_style_var_when_type_is_apparent = true:silent
+csharp_style_var_elsewhere = false:silent
+
+# Naming conventions
+# Interfaces should be PascalCase with leading 'I'
+dotnet_naming_rule.interface_rule.severity = suggestion
+dotnet_naming_rule.interface_rule.symbols = interface_symbol
+dotnet_naming_rule.interface_rule.style = interface_style
+dotnet_naming_symbols.interface_symbol.applicable_kinds = interface
+dotnet_naming_symbols.interface_symbol.applicable_accessibilities = public, internal, protected, protected_internal, private_protected, private
+dotnet_naming_symbols.interface_symbol.required_modifiers = 
+dotnet_naming_style.interface_style.required_prefix = I
+dotnet_naming_style.interface_style.capitalization = pascal_case
+
+# Const fields should be UPPER_CASE
+dotnet_naming_rule.constants_rule.severity = suggestion
+dotnet_naming_rule.constants_rule.symbols = constants_symbol
+dotnet_naming_rule.constants_rule.style = constants_style
+dotnet_naming_symbols.constants_symbol.applicable_kinds = field
+dotnet_naming_symbols.constants_symbol.required_modifiers = const
+dotnet_naming_style.constants_style.capitalization = all_upper
+
+# Private fields should be _camelCase
+dotnet_naming_rule.private_field_rule.severity = suggestion
+dotnet_naming_rule.private_field_rule.symbols = private_field_symbol
+dotnet_naming_rule.private_field_rule.style = private_field_style
+dotnet_naming_symbols.private_field_symbol.applicable_kinds = field
+dotnet_naming_symbols.private_field_symbol.applicable_accessibilities = private
+dotnet_naming_style.private_field_style.required_prefix = _
+dotnet_naming_style.private_field_style.capitalization = camel_case
+
+# Classes should be PascalCase
+dotnet_naming_rule.class_rule.severity = suggestion
+dotnet_naming_rule.class_rule.symbols = class_symbol
+dotnet_naming_rule.class_rule.style = pascal_case_style
+dotnet_naming_symbols.class_symbol.applicable_kinds = class
+dotnet_naming_style.pascal_case_style.capitalization = pascal_case
+
+# Public properties should be PascalCase
+dotnet_naming_rule.public_property_rule.severity = suggestion
+dotnet_naming_rule.public_property_rule.symbols = public_property_symbol
+dotnet_naming_rule.public_property_rule.style = pascal_case_style
+dotnet_naming_symbols.public_property_symbol.applicable_kinds = property
+dotnet_naming_symbols.public_property_symbol.applicable_accessibilities = public
+
+# JSON files
+[*.json]
+indent_style = space
+indent_size = 2
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# YAML files
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# Markdown files
+[*.md]
+trim_trailing_whitespace = true
+insert_final_newline = true
