@@ -46,7 +46,7 @@ var jwtAudience = Environment.GetEnvironmentVariable("Jwt__Audience")
 
 if (string.IsNullOrEmpty(connectionString))
 {
-	Console.WriteLine("⚠️ WARNING: ConnectionString not configured. Using Development defaults.");
+	throw new InvalidOperationException("Connection string not configured. Set ConnectionStrings__DefaultConnection environment variable or appsettings value.");
 }
 
 if (string.IsNullOrEmpty(jwtSecretKey) || jwtSecretKey.Length < 32)
@@ -104,7 +104,7 @@ else
 
 // Configure Database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-	options.UseNpgsql(connectionString ?? "Host=localhost;Database=bidupdb;Username=postgres;Password=postgres"));
+	options.UseNpgsql(connectionString));
 
 // Configure Identity
 builder.Services.AddIdentity<User, IdentityRole<Guid>>(options =>
