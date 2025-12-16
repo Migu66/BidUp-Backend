@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using StackExchange.Redis;
+using AspNetCoreRateLimit;
 using BidUp.Api.Application.Services;
 using BidUp.Api.Configuration;
 using BidUp.Api.Domain.Entities;
@@ -68,6 +70,35 @@ builder.Services.Configure<JwtSettings>(options =>
 	options.AccessTokenExpirationMinutes = jwtSettings.AccessTokenExpirationMinutes;
 	options.RefreshTokenExpirationDays = jwtSettings.RefreshTokenExpirationDays;
 });
+
+// Configure Redis
+var redisConnectionString = Environment.GetEnvironmentVariable("Redis__ConnectionString")
+	?? builder.Configuration["Redis:ConnectionString"]
+	?? "localhost:6379";
+var redisEnabled = bool.TryParse(
+	Environment.GetEnvironmentVariable("Redis__Enabled") ?? builder.Configuration["Redis:Enabled"],
+	out var enabled) && enabled;
+
+if (redisEnabled)
+{
+	try
+	{
+		var redis = ConnectionMultiplexer.Connect(redisConnectionString);
+		builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+		builder.Services.AddSingleton<IDistributedLockService, RedisDistributedLockService>();
+		Console.WriteLine("✅ Redis conectado correctamente.");
+	}
+	catch (Exception ex)
+	{
+		Console.WriteLine($"⚠️ No se pudo conectar a Redis: {ex.Message}. Usando locks en memoria.");
+		builder.Services.AddSingleton<IDistributedLockService, InMemoryDistributedLockService>();
+	}
+}
+else
+{
+	Console.WriteLine("ℹ️ Redis deshabilitado. Usando locks en memoria.");
+	builder.Services.AddSingleton<IDistributedLockService, InMemoryDistributedLockService>();
+}
 
 // Configure Database
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -146,6 +177,8 @@ builder.Services.AddAuthorization();
 // Register Services
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IAuctionService, AuctionService>();
+builder.Services.AddScoped<IBidService, BidService>();
 
 // Add Controllers
 builder.Services.AddControllers();
@@ -157,6 +190,46 @@ builder.Services.AddSignalR(options =>
 	options.KeepAliveInterval = TimeSpan.FromSeconds(15);
 	options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
 });
+
+// Configure Rate Limiting
+builder.Services.AddMemoryCache();
+builder.Services.Configure<IpRateLimitOptions>(options =>
+{
+	options.EnableEndpointRateLimiting = true;
+	options.StackBlockedRequests = false;
+	options.HttpStatusCode = 429;
+	options.RealIpHeader = "X-Real-IP";
+	options.ClientIdHeader = "X-ClientId";
+	options.GeneralRules = new List<RateLimitRule>
+	{
+		// Regla general: 100 requests por minuto
+		new RateLimitRule
+		{
+			Endpoint = "*",
+			Period = "1m",
+			Limit = 100
+		},
+		// Regla específica para pujas: 10 pujas por minuto por usuario
+		new RateLimitRule
+		{
+			Endpoint = "*:/api/auctions/*/bids",
+			Period = "1m",
+			Limit = 10
+		},
+		// Regla para login: 5 intentos por minuto
+		new RateLimitRule
+		{
+			Endpoint = "*:/api/auth/login",
+			Period = "1m",
+			Limit = 5
+		}
+	};
+});
+builder.Services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
+builder.Services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+builder.Services.AddSingleton<IProcessingStrategy, AsyncKeyLockProcessingStrategy>();
+builder.Services.AddInMemoryRateLimiting();
 
 // Configure OpenAPI/Swagger with JWT support
 builder.Services.AddEndpointsApiExplorer();
@@ -225,6 +298,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+// Use Rate Limiting
+app.UseIpRateLimiting();
 
 app.UseCors("AllowAll");
 
