@@ -4,11 +4,14 @@ using System.Security.Claims;
 using BidUp.Api.Application.DTOs.Auction;
 using BidUp.Api.Application.DTOs.Common;
 using BidUp.Api.Domain.Interfaces;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace BidUp.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Produces("application/json")]
+[Consumes("application/json")]
 public class AuctionsController : ControllerBase
 {
 	private readonly IAuctionService _auctionService;
@@ -28,7 +31,12 @@ public class AuctionsController : ControllerBase
 	/// <summary>
 	/// Obtener subastas activas
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Listar subastas activas",
+		Description = "Devuelve subastas activas ordenadas por tiempo restante.",
+		Tags = new[] { "Auctions" })]
 	[HttpGet]
+	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<AuctionDto>>), StatusCodes.Status200OK)]
 	public async Task<ActionResult<ApiResponseDto<IEnumerable<AuctionDto>>>> GetActiveAuctions(
 		[FromQuery] int page = 1,
 		[FromQuery] int pageSize = 20)
@@ -46,7 +54,13 @@ public class AuctionsController : ControllerBase
 	/// <summary>
 	/// Obtener una subasta por ID
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Detalle de subasta",
+		Description = "Incluye vendedor, categoría y última puja.",
+		Tags = new[] { "Auctions" })]
 	[HttpGet("{id:guid}")]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status404NotFound)]
 	public async Task<ActionResult<ApiResponseDto<AuctionDto>>> GetById(Guid id)
 	{
 		var auction = await _auctionService.GetByIdAsync(id);
@@ -70,7 +84,12 @@ public class AuctionsController : ControllerBase
 	/// <summary>
 	/// Obtener subastas por categoría
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Subastas por categoría",
+		Description = "Lista subastas activas filtradas por categoría.",
+		Tags = new[] { "Auctions" })]
 	[HttpGet("category/{categoryId:guid}")]
+	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<AuctionDto>>), StatusCodes.Status200OK)]
 	public async Task<ActionResult<ApiResponseDto<IEnumerable<AuctionDto>>>> GetByCategory(
 		Guid categoryId,
 		[FromQuery] int page = 1,
@@ -88,8 +107,15 @@ public class AuctionsController : ControllerBase
 	/// <summary>
 	/// Crear una nueva subasta (requiere autenticación)
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Crear subasta",
+		Description = "Crea una subasta con título, descripción, precios y tiempos.",
+		Tags = new[] { "Auctions" })]
 	[Authorize]
 	[HttpPost]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status201Created)]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status400BadRequest)]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status401Unauthorized)]
 	public async Task<ActionResult<ApiResponseDto<AuctionDto>>> Create([FromBody] CreateAuctionDto dto)
 	{
 		if (!ModelState.IsValid)
@@ -139,8 +165,16 @@ public class AuctionsController : ControllerBase
 	/// <summary>
 	/// Cancelar una subasta (solo el vendedor, sin pujas)
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Cancelar subasta",
+		Description = "Solo permitido si no existen pujas.",
+		Tags = new[] { "Auctions" })]
 	[Authorize]
 	[HttpDelete("{id:guid}")]
+	[ProducesResponseType(typeof(ApiResponseDto<object>), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponseDto<object>), StatusCodes.Status400BadRequest)]
+	[ProducesResponseType(typeof(ApiResponseDto<object>), StatusCodes.Status401Unauthorized)]
+	[ProducesResponseType(typeof(ApiResponseDto<object>), StatusCodes.Status404NotFound)]
 	public async Task<ActionResult<ApiResponseDto<object>>> Cancel(Guid id)
 	{
 		var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -185,7 +219,12 @@ public class AuctionsController : ControllerBase
 	/// <summary>
 	/// Obtener historial de pujas de una subasta
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Historial de pujas",
+		Description = "Lista las pujas ordenadas por timestamp descendente.",
+		Tags = new[] { "Bids" })]
 	[HttpGet("{id:guid}/bids")]
+	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<BidDto>>), StatusCodes.Status200OK)]
 	public async Task<ActionResult<ApiResponseDto<IEnumerable<BidDto>>>> GetBids(
 		Guid id,
 		[FromQuery] int page = 1,
@@ -203,8 +242,19 @@ public class AuctionsController : ControllerBase
 	/// <summary>
 	/// Colocar una puja (requiere autenticación)
 	/// </summary>
+	/// <remarks>
+	/// Concurrencia: el backend usa locks (Redis SETNX/Lua) y timestamp del servidor.\n
+	/// Rate limiting: 10 pujas por minuto por usuario.
+	/// </remarks>
+	[SwaggerOperation(
+		Summary = "Pujar",
+		Description = "Realiza una puja válida y notifica en tiempo real.",
+		Tags = new[] { "Bids" })]
 	[Authorize]
 	[HttpPost("{id:guid}/bids")]
+	[ProducesResponseType(typeof(ApiResponseDto<BidDto>), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponseDto<BidDto>), StatusCodes.Status400BadRequest)]
+	[ProducesResponseType(typeof(ApiResponseDto<BidDto>), StatusCodes.Status401Unauthorized)]
 	public async Task<ActionResult<ApiResponseDto<BidDto>>> PlaceBid(Guid id, [FromBody] PlaceBidDto dto)
 	{
 		if (!ModelState.IsValid)
@@ -252,8 +302,14 @@ public class AuctionsController : ControllerBase
 	/// <summary>
 	/// Obtener mis subastas (como vendedor)
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Mis subastas",
+		Description = "Lista subastas creadas por el usuario.",
+		Tags = new[] { "Auctions" })]
 	[Authorize]
 	[HttpGet("my-auctions")]
+	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<AuctionDto>>), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<AuctionDto>>), StatusCodes.Status401Unauthorized)]
 	public async Task<ActionResult<ApiResponseDto<IEnumerable<AuctionDto>>>> GetMyAuctions(
 		[FromQuery] int page = 1,
 		[FromQuery] int pageSize = 20)
@@ -280,8 +336,14 @@ public class AuctionsController : ControllerBase
 	/// <summary>
 	/// Obtener mis pujas
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Mis pujas",
+		Description = "Lista pujas realizadas por el usuario.",
+		Tags = new[] { "Bids" })]
 	[Authorize]
 	[HttpGet("my-bids")]
+	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<BidDto>>), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<BidDto>>), StatusCodes.Status401Unauthorized)]
 	public async Task<ActionResult<ApiResponseDto<IEnumerable<BidDto>>>> GetMyBids(
 		[FromQuery] int page = 1,
 		[FromQuery] int pageSize = 20)

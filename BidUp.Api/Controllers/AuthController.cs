@@ -4,11 +4,14 @@ using BidUp.Api.Application.DTOs.Auth;
 using BidUp.Api.Application.DTOs.Common;
 using BidUp.Api.Domain.Exceptions;
 using BidUp.Api.Domain.Interfaces;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace BidUp.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Produces("application/json")]
+[Consumes("application/json")]
 public class AuthController : ControllerBase
 {
 	private readonly IAuthService _authService;
@@ -21,6 +24,13 @@ public class AuthController : ControllerBase
 	/// <summary>
 	/// Registra un nuevo usuario
 	/// </summary>
+	/// <remarks>
+	/// Crea un usuario y devuelve tokens de acceso y refresco.
+	/// </remarks>
+	[SwaggerOperation(
+		Summary = "Registrar usuario",
+		Description = "Crea una cuenta nueva y devuelve tokens JWT de acceso y refresco.",
+		Tags = new[] { "Auth" })]
 	[HttpPost("register")]
 	[ProducesResponseType(typeof(ApiResponseDto<AuthResponseDto>), StatusCodes.Status201Created)]
 	[ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
@@ -51,6 +61,13 @@ public class AuthController : ControllerBase
 	/// <summary>
 	/// Inicia sesión y obtiene tokens de acceso
 	/// </summary>
+	/// <remarks>
+	/// Devuelve un access_token (15 min) y refresh_token (7 días).
+	/// </remarks>
+	[SwaggerOperation(
+		Summary = "Login",
+		Description = "Autentica credenciales y devuelve tokens JWT.",
+		Tags = new[] { "Auth" })]
 	[HttpPost("login")]
 	[ProducesResponseType(typeof(ApiResponseDto<AuthResponseDto>), StatusCodes.Status200OK)]
 	[ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status400BadRequest)]
@@ -80,6 +97,13 @@ public class AuthController : ControllerBase
 	/// <summary>
 	/// Renueva el token de acceso usando el refresh token
 	/// </summary>
+	/// <remarks>
+	/// Envía el refresh_token vigente para recibir un nuevo access_token.
+	/// </remarks>
+	[SwaggerOperation(
+		Summary = "Refrescar token",
+		Description = "Intercambia un refresh_token válido por nuevo access_token.",
+		Tags = new[] { "Auth" })]
 	[HttpPost("refresh-token")]
 	[ProducesResponseType(typeof(ApiResponseDto<AuthResponseDto>), StatusCodes.Status200OK)]
 	[ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status401Unauthorized)]
@@ -104,6 +128,10 @@ public class AuthController : ControllerBase
 	/// <summary>
 	/// Cierra la sesión revocando el refresh token
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Logout",
+		Description = "Revoca el refresh_token para cerrar sesión.",
+		Tags = new[] { "Auth" })]
 	[HttpPost("logout")]
 	[Authorize]
 	[ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status200OK)]
@@ -124,6 +152,10 @@ public class AuthController : ControllerBase
 	/// <summary>
 	/// Endpoint protegido de ejemplo - Obtiene información del usuario actual
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Usuario actual",
+		Description = "Devuelve datos básicos del usuario autenticado.",
+		Tags = new[] { "Auth" })]
 	[HttpGet("me")]
 	[Authorize]
 	[ProducesResponseType(typeof(ApiResponseDto<object>), StatusCodes.Status200OK)]

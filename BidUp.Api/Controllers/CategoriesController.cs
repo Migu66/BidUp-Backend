@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using BidUp.Api.Application.DTOs.Common;
 using BidUp.Api.Configuration;
 using BidUp.Api.Domain.Entities;
+using Swashbuckle.AspNetCore.Annotations;
 
 namespace BidUp.Api.Controllers;
 
@@ -25,6 +26,8 @@ public class CreateCategoryDto
 
 [ApiController]
 [Route("api/[controller]")]
+[Produces("application/json")]
+[Consumes("application/json")]
 public class CategoriesController : ControllerBase
 {
 	private readonly ApplicationDbContext _context;
@@ -37,7 +40,12 @@ public class CategoriesController : ControllerBase
 	/// <summary>
 	/// Obtener todas las categorías
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Listar categorías",
+		Description = "Devuelve categorías activas con conteo de subastas activas.",
+		Tags = new[] { "Categories" })]
 	[HttpGet]
+	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<CategoryDto>>), StatusCodes.Status200OK)]
 	public async Task<ActionResult<ApiResponseDto<IEnumerable<CategoryDto>>>> GetAll()
 	{
 		var categories = await _context.Categories
@@ -62,7 +70,13 @@ public class CategoriesController : ControllerBase
 	/// <summary>
 	/// Obtener una categoría por ID
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Detalle de categoría",
+		Description = "Devuelve la categoría y su conteo de subastas activas.",
+		Tags = new[] { "Categories" })]
 	[HttpGet("{id:guid}")]
+	[ProducesResponseType(typeof(ApiResponseDto<CategoryDto>), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponseDto<CategoryDto>), StatusCodes.Status404NotFound)]
 	public async Task<ActionResult<ApiResponseDto<CategoryDto>>> GetById(Guid id)
 	{
 		var category = await _context.Categories
@@ -96,8 +110,15 @@ public class CategoriesController : ControllerBase
 	/// <summary>
 	/// Crear una nueva categoría (requiere autenticación - TODO: solo admin)
 	/// </summary>
+	[SwaggerOperation(
+		Summary = "Crear categoría",
+		Description = "Crea una categoría única por nombre.",
+		Tags = new[] { "Categories" })]
 	[Authorize]
 	[HttpPost]
+	[ProducesResponseType(typeof(ApiResponseDto<CategoryDto>), StatusCodes.Status201Created)]
+	[ProducesResponseType(typeof(ApiResponseDto<CategoryDto>), StatusCodes.Status400BadRequest)]
+	[ProducesResponseType(typeof(ApiResponseDto<CategoryDto>), StatusCodes.Status401Unauthorized)]
 	public async Task<ActionResult<ApiResponseDto<CategoryDto>>> Create([FromBody] CreateCategoryDto dto)
 	{
 		if (string.IsNullOrWhiteSpace(dto.Name))

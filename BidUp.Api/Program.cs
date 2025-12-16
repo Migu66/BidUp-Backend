@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Reflection;
+using Swashbuckle.AspNetCore.Annotations;
 using StackExchange.Redis;
 using AspNetCoreRateLimit;
 using BidUp.Api.Application.Services;
@@ -239,8 +241,19 @@ builder.Services.AddSwaggerGen(options =>
 	{
 		Title = "BidUp API",
 		Version = "v1",
-		Description = "API para la aplicación de subastas BidUp"
+		Description = "API para la aplicación de subastas BidUp.\n\nAutenticación: Bearer JWT.\n\nTiempo real: SignalR Hub en /hubs/auction (token vía query access_token)."
 	});
+
+	// Habilitar anotaciones (SwaggerOperation, etc.)
+	options.EnableAnnotations();
+
+	// Incluir comentarios XML para documentación enriquecida
+	var xmlFilename = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+	var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
+	if (File.Exists(xmlPath))
+	{
+		options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
+	}
 
 	options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
 	{
