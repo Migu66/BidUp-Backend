@@ -41,10 +41,11 @@ Thumbs.db
 
 ## Security / environment
 .env
-.env.*
+.env.local
+.env.*.local
 secrets.json
-appsettings.Development.json
 appsettings.Local.json
+appsettings.Development.local.json
 local.settings.json
 
 ## Coverage

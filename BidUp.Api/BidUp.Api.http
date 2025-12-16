@@ -1,6 +1,57 @@
 @BidUp.Api_HostAddress = http://localhost:5240
+@accessToken = YOUR_ACCESS_TOKEN_HERE
+@refreshToken = YOUR_REFRESH_TOKEN_HERE
 
-GET {{BidUp.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Registro de usuario
+POST {{BidUp.Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+    "firstName": "Juan",
+    "lastName": "García",
+    "email": "juan@example.com",
+    "userName": "juangarcia",
+    "password": "Password123!",
+    "confirmPassword": "Password123!"
+}
+
+### Login
+POST {{BidUp.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+    "emailOrUserName": "juan@example.com",
+    "password": "Password123!"
+}
+
+### Login con nombre de usuario
+POST {{BidUp.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+    "emailOrUserName": "juangarcia",
+    "password": "Password123!"
+}
+
+### Refrescar token
+POST {{BidUp.Api_HostAddress}}/api/auth/refresh-token
+Content-Type: application/json
+
+{
+    "refreshToken": "{{refreshToken}}"
+}
+
+### Obtener usuario actual (requiere autenticación)
+GET {{BidUp.Api_HostAddress}}/api/auth/me
+Authorization: Bearer {{accessToken}}
+
+### Cerrar sesión (requiere autenticación)
+POST {{BidUp.Api_HostAddress}}/api/auth/logout
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+    "refreshToken": "{{refreshToken}}"
+}
 
 ###
