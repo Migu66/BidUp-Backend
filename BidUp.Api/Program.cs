@@ -8,6 +8,7 @@ using BidUp.Api.Application.Services;
 using BidUp.Api.Configuration;
 using BidUp.Api.Domain.Entities;
 using BidUp.Api.Domain.Interfaces;
+using BidUp.Api.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -120,6 +121,24 @@ builder.Services.AddAuthentication(options =>
 		IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
 		ClockSkew = TimeSpan.Zero
 	};
+
+	// Configuración para SignalR: obtener token desde query string
+	options.Events = new JwtBearerEvents
+	{
+		OnMessageReceived = context =>
+		{
+			var accessToken = context.Request.Query["access_token"];
+			var path = context.HttpContext.Request.Path;
+
+			// Si la petición es para el Hub de SignalR, obtener el token de la query
+			if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+			{
+				context.Token = accessToken;
+			}
+
+			return Task.CompletedTask;
+		}
+	};
 });
 
 builder.Services.AddAuthorization();
@@ -130,6 +149,14 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 
 // Add Controllers
 builder.Services.AddControllers();
+
+// Configure SignalR
+builder.Services.AddSignalR(options =>
+{
+	options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+	options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+	options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+});
 
 // Configure OpenAPI/Swagger with JWT support
 builder.Services.AddEndpointsApiExplorer();
@@ -168,14 +195,19 @@ builder.Services.AddSwaggerGen(options =>
 	});
 });
 
-// Configure CORS
+// Configure CORS (SignalR requiere AllowCredentials, no compatible con AllowAnyOrigin)
 builder.Services.AddCors(options =>
 {
 	options.AddPolicy("AllowAll", policy =>
 	{
-		policy.AllowAnyOrigin()
+		policy.WithOrigins(
+				"http://localhost:3000",
+				"http://localhost:5173",
+				"https://localhost:3000",
+				"https://localhost:5173")
 			  .AllowAnyMethod()
-			  .AllowAnyHeader();
+			  .AllowAnyHeader()
+			  .AllowCredentials();
 	});
 });
 
@@ -200,6 +232,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Map SignalR Hubs
+app.MapHub<AuctionHub>("/hubs/auction");
 
 // Apply migrations automatically in development
 if (app.Environment.IsDevelopment())
