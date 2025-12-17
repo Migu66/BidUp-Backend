@@ -25,7 +25,7 @@ public class BidServiceTests
 		_mockLockService = new Mock<IDistributedLockService>();
 		_mockHubContext = new Mock<IHubContext<AuctionHub>>();
 		_mockLogger = new Mock<ILogger<BidService>>();
-		
+
 		// Setup básico para el HubContext (evitar excepciones al enviar notificaciones)
 		var mockClients = new Mock<IHubClients>();
 		var mockClientProxy = new Mock<IClientProxy>();
