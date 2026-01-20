@@ -36,17 +36,20 @@ public class AuctionsController : ControllerBase
 		Description = "Devuelve subastas activas ordenadas por tiempo restante.",
 		Tags = new[] { "Auctions" })]
 	[HttpGet]
-	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<AuctionDto>>), StatusCodes.Status200OK)]
-	public async Task<ActionResult<ApiResponseDto<IEnumerable<AuctionDto>>>> GetActiveAuctions(
+	[ProducesResponseType(typeof(PaginatedResponseDto<AuctionDto>), StatusCodes.Status200OK)]
+	public async Task<ActionResult<PaginatedResponseDto<AuctionDto>>> GetActiveAuctions(
 		[FromQuery] int page = 1,
 		[FromQuery] int pageSize = 20)
 	{
-		var auctions = await _auctionService.GetActiveAuctionsAsync(page, pageSize);
+		var (auctions, totalCount) = await _auctionService.GetActiveAuctionsAsync(page, pageSize);
+		var hasMore = page * pageSize < totalCount;
 
-		return Ok(new ApiResponseDto<IEnumerable<AuctionDto>>
+		return Ok(new PaginatedResponseDto<AuctionDto>
 		{
 			Success = true,
 			Data = auctions,
+			TotalCount = totalCount,
+			HasMore = hasMore,
 			Message = "Subastas obtenidas correctamente"
 		});
 	}
@@ -89,18 +92,21 @@ public class AuctionsController : ControllerBase
 		Description = "Lista subastas activas filtradas por categoría.",
 		Tags = new[] { "Auctions" })]
 	[HttpGet("category/{categoryId:guid}")]
-	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<AuctionDto>>), StatusCodes.Status200OK)]
-	public async Task<ActionResult<ApiResponseDto<IEnumerable<AuctionDto>>>> GetByCategory(
+	[ProducesResponseType(typeof(PaginatedResponseDto<AuctionDto>), StatusCodes.Status200OK)]
+	public async Task<ActionResult<PaginatedResponseDto<AuctionDto>>> GetByCategory(
 		Guid categoryId,
 		[FromQuery] int page = 1,
 		[FromQuery] int pageSize = 20)
 	{
-		var auctions = await _auctionService.GetAuctionsByCategoryAsync(categoryId, page, pageSize);
+		var (auctions, totalCount) = await _auctionService.GetAuctionsByCategoryAsync(categoryId, page, pageSize);
+		var hasMore = page * pageSize < totalCount;
 
-		return Ok(new ApiResponseDto<IEnumerable<AuctionDto>>
+		return Ok(new PaginatedResponseDto<AuctionDto>
 		{
 			Success = true,
-			Data = auctions
+			Data = auctions,
+			TotalCount = totalCount,
+			HasMore = hasMore
 		});
 	}
 
