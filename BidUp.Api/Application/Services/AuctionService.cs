@@ -149,6 +149,39 @@ public class AuctionService : IAuctionService
 		return true;
 	}
 
+	public async Task<AuctionDto> ActivateAuctionAsync(Guid auctionId, Guid sellerId)
+	{
+		var auction = await _context.Auctions
+			.Include(a => a.Seller)
+			.Include(a => a.Category)
+			.FirstOrDefaultAsync(a => a.Id == auctionId && a.SellerId == sellerId);
+
+		if (auction == null)
+		{
+			throw new InvalidOperationException("Subasta no encontrada o no tienes permisos para activarla.");
+		}
+
+		if (auction.Status != AuctionStatus.Pending)
+		{
+			throw new InvalidOperationException($"La subasta no se puede activar. Estado actual: {auction.Status}");
+		}
+
+		if (auction.EndTime <= DateTime.UtcNow)
+		{
+			throw new InvalidOperationException("No se puede activar una subasta cuya fecha de fin ya ha pasado.");
+		}
+
+		auction.Status = AuctionStatus.Active;
+		auction.StartTime = DateTime.UtcNow;
+		auction.UpdatedAt = DateTime.UtcNow;
+
+		await _context.SaveChangesAsync();
+
+		_logger.LogInformation("Subasta activada: {AuctionId} por vendedor {SellerId}", auctionId, sellerId);
+
+		return (await GetByIdAsync(auctionId))!;
+	}
+
 	public async Task<IEnumerable<BidDto>> GetAuctionBidsAsync(Guid auctionId, int page = 1, int pageSize = 50)
 	{
 		var bids = await _context.Bids

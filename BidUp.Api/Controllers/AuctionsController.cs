@@ -163,6 +163,52 @@ public class AuctionsController : ControllerBase
 	}
 
 	/// <summary>
+	/// Activar una subasta pendiente (solo el vendedor)
+	/// </summary>
+	[SwaggerOperation(
+		Summary = "Activar subasta",
+		Description = "Activa una subasta que está en estado Pending. Solo el vendedor puede activarla.",
+		Tags = new[] { "Auctions" })]
+	[Authorize]
+	[HttpPost("{id:guid}/activate")]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status400BadRequest)]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status401Unauthorized)]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status404NotFound)]
+	public async Task<ActionResult<ApiResponseDto<AuctionDto>>> ActivateAuction(Guid id)
+	{
+		var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+		if (string.IsNullOrEmpty(userId))
+		{
+			return Unauthorized(new ApiResponseDto<AuctionDto>
+			{
+				Success = false,
+				Message = "Usuario no autenticado"
+			});
+		}
+
+		try
+		{
+			var auction = await _auctionService.ActivateAuctionAsync(id, Guid.Parse(userId));
+
+			return Ok(new ApiResponseDto<AuctionDto>
+			{
+				Success = true,
+				Data = auction,
+				Message = "Subasta activada correctamente"
+			});
+		}
+		catch (InvalidOperationException ex)
+		{
+			return BadRequest(new ApiResponseDto<AuctionDto>
+			{
+				Success = false,
+				Message = ex.Message
+			});
+		}
+	}
+
+	/// <summary>
 	/// Cancelar una subasta (solo el vendedor, sin pujas)
 	/// </summary>
 	[SwaggerOperation(

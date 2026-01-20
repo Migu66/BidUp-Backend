@@ -10,5 +10,6 @@ public interface IAuctionService
 	Task<IEnumerable<AuctionDto>> GetAuctionsBySellerAsync(Guid sellerId, int page = 1, int pageSize = 20);
 	Task<AuctionDto> CreateAuctionAsync(CreateAuctionDto dto, Guid sellerId);
 	Task<bool> CancelAuctionAsync(Guid auctionId, Guid sellerId);
+	Task<AuctionDto> ActivateAuctionAsync(Guid auctionId, Guid sellerId);
 	Task<IEnumerable<BidDto>> GetAuctionBidsAsync(Guid auctionId, int page = 1, int pageSize = 50);
 }
