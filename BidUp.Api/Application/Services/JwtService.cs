@@ -95,4 +95,9 @@ public class JwtService : IJwtService
 	{
 		return DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpirationDays);
 	}
+
+	public int GetAccessTokenExpirationSeconds()
+	{
+		return _jwtSettings.AccessTokenExpirationMinutes * 60;
+	}
 }

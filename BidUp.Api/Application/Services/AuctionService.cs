@@ -32,36 +32,44 @@ public class AuctionService : IAuctionService
 		return MapToDto(auction);
 	}
 
-	public async Task<IEnumerable<AuctionDto>> GetActiveAuctionsAsync(int page = 1, int pageSize = 20)
+	public async Task<(IEnumerable<AuctionDto> Auctions, int TotalCount)> GetActiveAuctionsAsync(int page = 1, int pageSize = 20)
 	{
-		var auctions = await _context.Auctions
+		var query = _context.Auctions
+			.Where(a => a.Status == AuctionStatus.Active && a.EndTime > DateTime.UtcNow);
+
+		var totalCount = await query.CountAsync();
+
+		var auctions = await query
 			.Include(a => a.Seller)
 			.Include(a => a.Category)
 			.Include(a => a.Bids.OrderByDescending(b => b.Amount).Take(1))
 				.ThenInclude(b => b.Bidder)
-			.Where(a => a.Status == AuctionStatus.Active && a.EndTime > DateTime.UtcNow)
 			.OrderBy(a => a.EndTime)
 			.Skip((page - 1) * pageSize)
 			.Take(pageSize)
 			.ToListAsync();
 
-		return auctions.Select(MapToDto);
+		return (auctions.Select(MapToDto), totalCount);
 	}
 
-	public async Task<IEnumerable<AuctionDto>> GetAuctionsByCategoryAsync(Guid categoryId, int page = 1, int pageSize = 20)
+	public async Task<(IEnumerable<AuctionDto> Auctions, int TotalCount)> GetAuctionsByCategoryAsync(Guid categoryId, int page = 1, int pageSize = 20)
 	{
-		var auctions = await _context.Auctions
+		var query = _context.Auctions
+			.Where(a => a.CategoryId == categoryId && a.Status == AuctionStatus.Active);
+
+		var totalCount = await query.CountAsync();
+
+		var auctions = await query
 			.Include(a => a.Seller)
 			.Include(a => a.Category)
 			.Include(a => a.Bids.OrderByDescending(b => b.Amount).Take(1))
 				.ThenInclude(b => b.Bidder)
-			.Where(a => a.CategoryId == categoryId && a.Status == AuctionStatus.Active)
 			.OrderBy(a => a.EndTime)
 			.Skip((page - 1) * pageSize)
 			.Take(pageSize)
 			.ToListAsync();
 
-		return auctions.Select(MapToDto);
+		return (auctions.Select(MapToDto), totalCount);
 	}
 
 	public async Task<IEnumerable<AuctionDto>> GetAuctionsBySellerAsync(Guid sellerId, int page = 1, int pageSize = 20)
@@ -147,6 +155,39 @@ public class AuctionService : IAuctionService
 
 		_logger.LogInformation("Subasta cancelada: {AuctionId}", auctionId);
 		return true;
+	}
+
+	public async Task<AuctionDto> ActivateAuctionAsync(Guid auctionId, Guid sellerId)
+	{
+		var auction = await _context.Auctions
+			.Include(a => a.Seller)
+			.Include(a => a.Category)
+			.FirstOrDefaultAsync(a => a.Id == auctionId && a.SellerId == sellerId);
+
+		if (auction == null)
+		{
+			throw new InvalidOperationException("Subasta no encontrada o no tienes permisos para activarla.");
+		}
+
+		if (auction.Status != AuctionStatus.Pending)
+		{
+			throw new InvalidOperationException($"La subasta no se puede activar. Estado actual: {auction.Status}");
+		}
+
+		if (auction.EndTime <= DateTime.UtcNow)
+		{
+			throw new InvalidOperationException("No se puede activar una subasta cuya fecha de fin ya ha pasado.");
+		}
+
+		auction.Status = AuctionStatus.Active;
+		auction.StartTime = DateTime.UtcNow;
+		auction.UpdatedAt = DateTime.UtcNow;
+
+		await _context.SaveChangesAsync();
+
+		_logger.LogInformation("Subasta activada: {AuctionId} por vendedor {SellerId}", auctionId, sellerId);
+
+		return (await GetByIdAsync(auctionId))!;
 	}
 
 	public async Task<IEnumerable<BidDto>> GetAuctionBidsAsync(Guid auctionId, int page = 1, int pageSize = 50)

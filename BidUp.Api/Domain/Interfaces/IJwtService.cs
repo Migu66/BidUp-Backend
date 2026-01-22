@@ -10,4 +10,5 @@ public interface IJwtService
 	ClaimsPrincipal? GetPrincipalFromExpiredToken(string token);
 	DateTime GetAccessTokenExpiration();
 	DateTime GetRefreshTokenExpiration();
+	int GetAccessTokenExpirationSeconds();
 }

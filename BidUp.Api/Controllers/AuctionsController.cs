@@ -36,17 +36,20 @@ public class AuctionsController : ControllerBase
 		Description = "Devuelve subastas activas ordenadas por tiempo restante.",
 		Tags = new[] { "Auctions" })]
 	[HttpGet]
-	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<AuctionDto>>), StatusCodes.Status200OK)]
-	public async Task<ActionResult<ApiResponseDto<IEnumerable<AuctionDto>>>> GetActiveAuctions(
+	[ProducesResponseType(typeof(PaginatedResponseDto<AuctionDto>), StatusCodes.Status200OK)]
+	public async Task<ActionResult<PaginatedResponseDto<AuctionDto>>> GetActiveAuctions(
 		[FromQuery] int page = 1,
 		[FromQuery] int pageSize = 20)
 	{
-		var auctions = await _auctionService.GetActiveAuctionsAsync(page, pageSize);
+		var (auctions, totalCount) = await _auctionService.GetActiveAuctionsAsync(page, pageSize);
+		var hasMore = page * pageSize < totalCount;
 
-		return Ok(new ApiResponseDto<IEnumerable<AuctionDto>>
+		return Ok(new PaginatedResponseDto<AuctionDto>
 		{
 			Success = true,
 			Data = auctions,
+			TotalCount = totalCount,
+			HasMore = hasMore,
 			Message = "Subastas obtenidas correctamente"
 		});
 	}
@@ -89,18 +92,21 @@ public class AuctionsController : ControllerBase
 		Description = "Lista subastas activas filtradas por categoría.",
 		Tags = new[] { "Auctions" })]
 	[HttpGet("category/{categoryId:guid}")]
-	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<AuctionDto>>), StatusCodes.Status200OK)]
-	public async Task<ActionResult<ApiResponseDto<IEnumerable<AuctionDto>>>> GetByCategory(
+	[ProducesResponseType(typeof(PaginatedResponseDto<AuctionDto>), StatusCodes.Status200OK)]
+	public async Task<ActionResult<PaginatedResponseDto<AuctionDto>>> GetByCategory(
 		Guid categoryId,
 		[FromQuery] int page = 1,
 		[FromQuery] int pageSize = 20)
 	{
-		var auctions = await _auctionService.GetAuctionsByCategoryAsync(categoryId, page, pageSize);
+		var (auctions, totalCount) = await _auctionService.GetAuctionsByCategoryAsync(categoryId, page, pageSize);
+		var hasMore = page * pageSize < totalCount;
 
-		return Ok(new ApiResponseDto<IEnumerable<AuctionDto>>
+		return Ok(new PaginatedResponseDto<AuctionDto>
 		{
 			Success = true,
-			Data = auctions
+			Data = auctions,
+			TotalCount = totalCount,
+			HasMore = hasMore
 		});
 	}
 
@@ -153,6 +159,52 @@ public class AuctionsController : ControllerBase
 				});
 		}
 		catch (ArgumentException ex)
+		{
+			return BadRequest(new ApiResponseDto<AuctionDto>
+			{
+				Success = false,
+				Message = ex.Message
+			});
+		}
+	}
+
+	/// <summary>
+	/// Activar una subasta pendiente (solo el vendedor)
+	/// </summary>
+	[SwaggerOperation(
+		Summary = "Activar subasta",
+		Description = "Activa una subasta que está en estado Pending. Solo el vendedor puede activarla.",
+		Tags = new[] { "Auctions" })]
+	[Authorize]
+	[HttpPost("{id:guid}/activate")]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status400BadRequest)]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status401Unauthorized)]
+	[ProducesResponseType(typeof(ApiResponseDto<AuctionDto>), StatusCodes.Status404NotFound)]
+	public async Task<ActionResult<ApiResponseDto<AuctionDto>>> ActivateAuction(Guid id)
+	{
+		var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+		if (string.IsNullOrEmpty(userId))
+		{
+			return Unauthorized(new ApiResponseDto<AuctionDto>
+			{
+				Success = false,
+				Message = "Usuario no autenticado"
+			});
+		}
+
+		try
+		{
+			var auction = await _auctionService.ActivateAuctionAsync(id, Guid.Parse(userId));
+
+			return Ok(new ApiResponseDto<AuctionDto>
+			{
+				Success = true,
+				Data = auction,
+				Message = "Subasta activada correctamente"
+			});
+		}
+		catch (InvalidOperationException ex)
 		{
 			return BadRequest(new ApiResponseDto<AuctionDto>
 			{

@@ -14,13 +14,13 @@ services:
       - ASPNETCORE_URLS=https://+:443;http://+:80
       - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
       - ASPNETCORE_Kestrel__Certificates__Default__Password=your_password_here
+      - ConnectionStrings__DefaultConnection=Host=bidup-db;Database=bidupdb;Username=postgres;Password=postgres
     volumes:
-      - ./BidUp.Api:/app/BidUp.Api
       - ~/.aspnet/https:/https:ro
     networks:
       - bidup-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/weatherforecast"]
+      test: [ "CMD", "curl", "-f", "http://localhost/weatherforecast" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -29,19 +29,20 @@ services:
       - bidup-db
 
   bidup-db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: postgres:16-alpine
     container_name: bidup-db
     environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=YourPassword@123
+      - POSTGRES_DB=bidupdb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
     ports:
-      - "1433:1433"
+      - "5432:5432"
     volumes:
-      - bidup-db-data:/var/opt/mssql
+      - bidup-db-data:/var/lib/postgresql/data
     networks:
       - bidup-network
     healthcheck:
-      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "YourPassword@123", "-Q", "SELECT 1"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 3s
       retries: 10

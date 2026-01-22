@@ -140,6 +140,52 @@ public class AuthService : IAuthService
 		};
 	}
 
+	public async Task<TokenResponseDto> RefreshAsync(string refreshToken)
+	{
+		var storedToken = await _context.RefreshTokens
+			.Include(rt => rt.User)
+			.FirstOrDefaultAsync(rt => rt.Token == refreshToken);
+
+		if (storedToken == null)
+		{
+			throw new AuthenticationException("Token de refresco inválido");
+		}
+
+		if (!storedToken.IsActive)
+		{
+			// Si alguien intenta usar un token revocado o expirado, revocar todos los tokens del usuario
+			if (storedToken.IsRevoked)
+			{
+				await RevokeAllUserTokensAsync(storedToken.UserId, "Intento de reutilización de token revocado");
+			}
+			throw new AuthenticationException("Token de refresco inválido o expirado");
+		}
+
+		var user = storedToken.User;
+		if (!user.IsActive)
+		{
+			throw new AuthenticationException("La cuenta está desactivada");
+		}
+
+		// Revocar el token actual
+		storedToken.RevokedAt = DateTime.UtcNow;
+		storedToken.ReasonRevoked = "Reemplazado por nuevo token";
+
+		// Generar nuevo refresh token
+		var newRefreshToken = CreateRefreshToken(user.Id);
+		storedToken.ReplacedByToken = newRefreshToken.Token;
+
+		_context.RefreshTokens.Add(newRefreshToken);
+		await _context.SaveChangesAsync();
+
+		return new TokenResponseDto
+		{
+			AccessToken = _jwtService.GenerateAccessToken(user),
+			RefreshToken = newRefreshToken.Token,
+			ExpiresIn = _jwtService.GetAccessTokenExpirationSeconds()
+		};
+	}
+
 	public async Task RevokeTokenAsync(string refreshToken)
 	{
 		var storedToken = await _context.RefreshTokens

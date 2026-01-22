@@ -126,6 +126,37 @@ public class AuthController : ControllerBase
 	}
 
 	/// <summary>
+	/// Renueva el token de acceso (versión simplificada)
+	/// </summary>
+	/// <remarks>
+	/// POST /api/Auth/refresh - Recibe refresh_token y devuelve nuevos tokens con expiresIn en segundos.
+	/// </remarks>
+	[SwaggerOperation(
+		Summary = "Refresh",
+		Description = "Intercambia un refresh_token válido por nuevo access_token y refresh_token.",
+		Tags = new[] { "Auth" })]
+	[HttpPost("refresh")]
+	[ProducesResponseType(typeof(ApiResponseDto<TokenResponseDto>), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status401Unauthorized)]
+	public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequestDto request)
+	{
+		if (!ModelState.IsValid)
+		{
+			return BadRequest(ApiResponseDto.ErrorResponse("Token de refresco requerido"));
+		}
+
+		try
+		{
+			var result = await _authService.RefreshAsync(request.RefreshToken);
+			return Ok(ApiResponseDto<TokenResponseDto>.SuccessResponse(result, "Token renovado exitosamente"));
+		}
+		catch (AuthenticationException ex)
+		{
+			return Unauthorized(ApiResponseDto.ErrorResponse(ex.Message));
+		}
+	}
+
+	/// <summary>
 	/// Cierra la sesión revocando el refresh token
 	/// </summary>
 	[SwaggerOperation(
@@ -142,6 +173,38 @@ public class AuthController : ControllerBase
 		{
 			await _authService.RevokeTokenAsync(request.RefreshToken);
 			return Ok(ApiResponseDto.SuccessResponse("Sesión cerrada exitosamente"));
+		}
+		catch (AuthenticationException ex)
+		{
+			return Unauthorized(ApiResponseDto.ErrorResponse(ex.Message));
+		}
+	}
+
+	/// <summary>
+	/// Revoca un refresh token (invalidarlo para logout)
+	/// </summary>
+	/// <remarks>
+	/// POST /api/Auth/revoke - Invalida el refresh_token especificado.
+	/// Útil para cerrar sesión o invalidar tokens comprometidos.
+	/// </remarks>
+	[SwaggerOperation(
+		Summary = "Revocar token",
+		Description = "Invalida un refresh_token específico.",
+		Tags = new[] { "Auth" })]
+	[HttpPost("revoke")]
+	[ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status200OK)]
+	[ProducesResponseType(typeof(ApiResponseDto), StatusCodes.Status401Unauthorized)]
+	public async Task<IActionResult> RevokeToken([FromBody] RevokeTokenRequestDto request)
+	{
+		if (!ModelState.IsValid)
+		{
+			return BadRequest(ApiResponseDto.ErrorResponse("Token de refresco requerido"));
+		}
+
+		try
+		{
+			await _authService.RevokeTokenAsync(request.RefreshToken);
+			return Ok(ApiResponseDto.SuccessResponse("Token revocado exitosamente"));
 		}
 		catch (AuthenticationException ex)
 		{
