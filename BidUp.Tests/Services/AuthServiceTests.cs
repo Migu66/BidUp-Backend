@@ -38,6 +38,8 @@ public class AuthServiceTests
 			.Returns(DateTime.UtcNow.AddMinutes(15));
 		_mockJwtService.Setup(x => x.GetRefreshTokenExpiration())
 			.Returns(DateTime.UtcNow.AddDays(7));
+		_mockJwtService.Setup(x => x.GetAccessTokenExpirationSeconds())
+			.Returns(900); // 15 minutos en segundos
 
 		// Configurar DbContext con InMemory
 		var options = new DbContextOptionsBuilder<ApplicationDbContext>()
@@ -129,7 +131,7 @@ public class AuthServiceTests
 
 		_mockUserManager.Setup(x => x.FindByEmailAsync(registerDto.Email))
 			.ReturnsAsync((User?)null);
-		
+
 		var existingUser = new User { UserName = registerDto.UserName };
 		_mockUserManager.Setup(x => x.FindByNameAsync(registerDto.UserName))
 			.ReturnsAsync(existingUser);
@@ -374,7 +376,7 @@ public class AuthServiceTests
 		result.Should().NotBeNull();
 		result.AccessToken.Should().Be("fake-access-token");
 		result.RefreshToken.Should().NotBe(refreshToken.Token);
-		
+
 		// Verificar que el token anterior fue revocado
 		var oldToken = await _context.RefreshTokens.FindAsync(refreshToken.Id);
 		oldToken!.RevokedAt.Should().NotBeNull();
@@ -429,7 +431,7 @@ public class AuthServiceTests
 		// Assert
 		await act.Should().ThrowAsync<AuthenticationException>()
 			.WithMessage("Token de refresco inválido o expirado");
-		
+
 		// Verificar que se revocaron todos los tokens del usuario
 		var allTokens = await _context.RefreshTokens
 			.Where(rt => rt.UserId == user.Id)
@@ -505,6 +507,103 @@ public class AuthServiceTests
 		// Assert
 		await act.Should().ThrowAsync<AuthenticationException>()
 			.WithMessage("La cuenta está desactivada");
+	}
+
+	#endregion
+
+	#region RefreshAsync Tests (TokenResponseDto)
+
+	[Fact]
+	public async Task RefreshAsync_WithValidToken_ReturnsTokenResponse()
+	{
+		// Arrange
+		var user = new User
+		{
+			Id = Guid.NewGuid(),
+			Email = "juan@example.com",
+			UserName = "juanperez",
+			FirstName = "Juan",
+			LastName = "Pérez",
+			IsActive = true
+		};
+
+		var refreshToken = new RefreshToken
+		{
+			Id = Guid.NewGuid(),
+			Token = "valid-refresh-token-for-refresh",
+			UserId = user.Id,
+			User = user,
+			CreatedAt = DateTime.UtcNow,
+			ExpiresAt = DateTime.UtcNow.AddDays(7),
+			RevokedAt = null
+		};
+
+		_context.Users.Add(user);
+		_context.RefreshTokens.Add(refreshToken);
+		await _context.SaveChangesAsync();
+
+		// Act
+		var result = await _authService.RefreshAsync(refreshToken.Token);
+
+		// Assert
+		result.Should().NotBeNull();
+		result.AccessToken.Should().Be("fake-access-token");
+		result.RefreshToken.Should().NotBe(refreshToken.Token);
+		result.ExpiresIn.Should().Be(900); // 15 minutos en segundos
+
+		// Verificar que el token anterior fue revocado
+		var oldToken = await _context.RefreshTokens.FindAsync(refreshToken.Id);
+		oldToken!.RevokedAt.Should().NotBeNull();
+		oldToken.ReasonRevoked.Should().Be("Reemplazado por nuevo token");
+	}
+
+	[Fact]
+	public async Task RefreshAsync_WithInvalidToken_ThrowsAuthenticationException()
+	{
+		// Arrange
+		var invalidToken = "invalid-refresh-token-refresh";
+
+		// Act
+		Func<Task> act = async () => await _authService.RefreshAsync(invalidToken);
+
+		// Assert
+		await act.Should().ThrowAsync<AuthenticationException>()
+			.WithMessage("Token de refresco inválido");
+	}
+
+	[Fact]
+	public async Task RefreshAsync_WithExpiredToken_ThrowsAuthenticationException()
+	{
+		// Arrange
+		var user = new User
+		{
+			Id = Guid.NewGuid(),
+			Email = "juan@example.com",
+			UserName = "juanperez",
+			IsActive = true
+		};
+
+		var expiredToken = new RefreshToken
+		{
+			Id = Guid.NewGuid(),
+			Token = "expired-refresh-token-refresh",
+			UserId = user.Id,
+			User = user,
+			CreatedAt = DateTime.UtcNow.AddDays(-8),
+			ExpiresAt = DateTime.UtcNow.AddDays(-1),
+			RevokedAt = null
+		};
+
+		_context.Users.Add(user);
+		_context.RefreshTokens.Add(expiredToken);
+		await _context.SaveChangesAsync();
+
+		// Act
+		Func<Task> act = async () => await _authService.RefreshAsync(expiredToken.Token);
+
+		// Assert
+		await act.Should().ThrowAsync<AuthenticationException>()
+			.WithMessage("Token de refresco inválido o expirado");
 	}
 
 	#endregion

@@ -41,6 +41,14 @@ Content-Type: application/json
     "refreshToken": "{{refreshToken}}"
 }
 
+### Refrescar token (versión simplificada - retorna expiresIn en segundos)
+POST {{BidUp.Api_HostAddress}}/api/auth/refresh
+Content-Type: application/json
+
+{
+    "refreshToken": "{{refreshToken}}"
+}
+
 ### Obtener usuario actual (requiere autenticación)
 GET {{BidUp.Api_HostAddress}}/api/auth/me
 Authorization: Bearer {{accessToken}}
@@ -48,6 +56,14 @@ Authorization: Bearer {{accessToken}}
 ### Cerrar sesión (requiere autenticación)
 POST {{BidUp.Api_HostAddress}}/api/auth/logout
 Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+    "refreshToken": "{{refreshToken}}"
+}
+
+### Revocar refresh token (invalidar token - no requiere autenticación)
+POST {{BidUp.Api_HostAddress}}/api/auth/revoke
 Content-Type: application/json
 
 {
