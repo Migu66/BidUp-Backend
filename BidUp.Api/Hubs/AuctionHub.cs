@@ -8,8 +8,9 @@ namespace BidUp.Api.Hubs;
 /// <summary>
 /// Hub de SignalR para subastas en tiempo real.
 /// Maneja la comunicación bidireccional entre servidor y clientes.
+/// Permite conexiones anónimas para recibir actualizaciones en tiempo real.
+/// Las acciones que modifican datos requieren autenticación con [Authorize].
 /// </summary>
-[Authorize]
 public class AuctionHub : Hub
 {
 	private readonly ILogger<AuctionHub> _logger;
@@ -20,13 +21,26 @@ public class AuctionHub : Hub
 	}
 
 	/// <summary>
-	/// Se ejecuta cuando un cliente se conecta al Hub
+	/// Verifica si el usuario actual está autenticado
+	/// </summary>
+	private bool IsAuthenticated => Context.User?.Identity?.IsAuthenticated ?? false;
+
+	/// <summary>
+	/// Obtiene el ID del usuario autenticado o null si es anónimo
+	/// </summary>
+	private string? GetUserId() => Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+	/// <summary>
+	/// Se ejecuta cuando un cliente se conecta al Hub.
+	/// Permite conexiones tanto autenticadas como anónimas.
 	/// </summary>
 	public override async Task OnConnectedAsync()
 	{
-		var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-		_logger.LogInformation("Cliente conectado: {ConnectionId}, Usuario: {UserId}",
-			Context.ConnectionId, userId ?? "Anónimo");
+		var userId = GetUserId();
+		var connectionType = IsAuthenticated ? "Autenticado" : "Anónimo";
+
+		_logger.LogInformation("Cliente conectado: {ConnectionId}, Usuario: {UserId}, Tipo: {ConnectionType}",
+			Context.ConnectionId, userId ?? "Anónimo", connectionType);
 
 		await base.OnConnectedAsync();
 	}
@@ -36,7 +50,7 @@ public class AuctionHub : Hub
 	/// </summary>
 	public override async Task OnDisconnectedAsync(Exception? exception)
 	{
-		var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+		var userId = GetUserId();
 		_logger.LogInformation("Cliente desconectado: {ConnectionId}, Usuario: {UserId}",
 			Context.ConnectionId, userId ?? "Anónimo");
 
@@ -50,7 +64,8 @@ public class AuctionHub : Hub
 	}
 
 	/// <summary>
-	/// Unirse a una sala de subasta específica para recibir actualizaciones
+	/// Unirse a una sala de subasta específica para recibir actualizaciones.
+	/// Permite usuarios anónimos para que puedan ver las subastas en tiempo real.
 	/// </summary>
 	/// <param name="auctionId">ID de la subasta</param>
 	public async Task JoinAuction(Guid auctionId)
@@ -58,21 +73,25 @@ public class AuctionHub : Hub
 		var groupName = GetAuctionGroupName(auctionId);
 		await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
 
-		var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-		_logger.LogInformation("Usuario {UserId} se unió a la subasta {AuctionId}",
-			userId, auctionId);
+		var userId = GetUserId();
+		var userType = IsAuthenticated ? "autenticado" : "anónimo";
+
+		_logger.LogInformation("Usuario {UserId} ({UserType}) se unió a la subasta {AuctionId}",
+			userId ?? Context.ConnectionId, userType, auctionId);
 
 		// Notificar al cliente que se unió exitosamente
 		await Clients.Caller.SendAsync("JoinedAuction", new
 		{
 			AuctionId = auctionId,
 			Message = "Te has unido a la subasta",
-			Timestamp = DateTime.UtcNow
+			Timestamp = DateTime.UtcNow,
+			IsAuthenticated = IsAuthenticated
 		});
 	}
 
 	/// <summary>
-	/// Salir de una sala de subasta
+	/// Salir de una sala de subasta.
+	/// Permite usuarios anónimos.
 	/// </summary>
 	/// <param name="auctionId">ID de la subasta</param>
 	public async Task LeaveAuction(Guid auctionId)
@@ -80,9 +99,9 @@ public class AuctionHub : Hub
 		var groupName = GetAuctionGroupName(auctionId);
 		await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
 
-		var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+		var userId = GetUserId();
 		_logger.LogInformation("Usuario {UserId} salió de la subasta {AuctionId}",
-			userId, auctionId);
+			userId ?? Context.ConnectionId, auctionId);
 
 		await Clients.Caller.SendAsync("LeftAuction", new
 		{
@@ -93,7 +112,8 @@ public class AuctionHub : Hub
 	}
 
 	/// <summary>
-	/// Solicitar sincronización del timer de la subasta
+	/// Solicitar sincronización del timer de la subasta.
+	/// Permite usuarios anónimos para mantener sincronizado el tiempo.
 	/// </summary>
 	/// <param name="auctionId">ID de la subasta</param>
 	public async Task RequestTimerSync(Guid auctionId)
@@ -106,6 +126,18 @@ public class AuctionHub : Hub
 			RequestedAt = DateTime.UtcNow
 		});
 	}
+
+	#region Métodos que requieren autenticación
+
+	// NOTA: Agregar aquí métodos que modifiquen datos con el atributo [Authorize]
+	// Ejemplo:
+	// [Authorize]
+	// public async Task PlaceBidViaHub(Guid auctionId, decimal amount)
+	// {
+	//     // Implementación de puja en tiempo real
+	// }
+
+	#endregion
 
 	/// <summary>
 	/// Obtener el nombre del grupo para una subasta
