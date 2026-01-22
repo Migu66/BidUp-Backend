@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using BidUp.Api.Application.DTOs.Auction;
+using BidUp.Api.Domain.Interfaces;
 using System.Security.Claims;
 
 namespace BidUp.Api.Hubs;
@@ -14,10 +15,12 @@ namespace BidUp.Api.Hubs;
 public class AuctionHub : Hub
 {
 	private readonly ILogger<AuctionHub> _logger;
+	private readonly IBidService _bidService;
 
-	public AuctionHub(ILogger<AuctionHub> logger)
+	public AuctionHub(ILogger<AuctionHub> logger, IBidService bidService)
 	{
 		_logger = logger;
+		_bidService = bidService;
 	}
 
 	/// <summary>
@@ -129,13 +132,83 @@ public class AuctionHub : Hub
 
 	#region Métodos que requieren autenticación
 
-	// NOTA: Agregar aquí métodos que modifiquen datos con el atributo [Authorize]
-	// Ejemplo:
-	// [Authorize]
-	// public async Task PlaceBidViaHub(Guid auctionId, decimal amount)
-	// {
-	//     // Implementación de puja en tiempo real
-	// }
+	/// <summary>
+	/// Coloca una puja a través de SignalR.
+	/// Requiere autenticación. Utiliza la conexión WebSocket existente para mayor eficiencia.
+	/// Envía BidAccepted al caller si la puja fue exitosa, o BidError si falló.
+	/// </summary>
+	/// <param name="auctionId">ID de la subasta (string para facilitar uso desde el cliente)</param>
+	/// <param name="amount">Monto de la puja</param>
+	[Authorize]
+	public async Task PlaceBid(string auctionId, decimal amount)
+	{
+		try
+		{
+			// Obtener userId del usuario autenticado
+			var userId = GetUserId();
+			if (string.IsNullOrEmpty(userId))
+			{
+				await Clients.Caller.SendAsync("BidError", "No autenticado. Debes iniciar sesión para pujar.");
+				return;
+			}
+
+			// Validar que el auctionId sea un GUID válido
+			if (!Guid.TryParse(auctionId, out var auctionGuid))
+			{
+				await Clients.Caller.SendAsync("BidError", "ID de subasta inválido.");
+				return;
+			}
+
+			// Validar que el userId sea un GUID válido
+			if (!Guid.TryParse(userId, out var userGuid))
+			{
+				await Clients.Caller.SendAsync("BidError", "ID de usuario inválido.");
+				return;
+			}
+
+			// Validar monto positivo
+			if (amount <= 0)
+			{
+				await Clients.Caller.SendAsync("BidError", "El monto de la puja debe ser mayor a cero.");
+				return;
+			}
+
+			_logger.LogInformation(
+				"Puja vía SignalR: Usuario {UserId}, Subasta {AuctionId}, Monto {Amount}",
+				userId, auctionId, amount);
+
+			// Usar la misma lógica que el endpoint HTTP
+			// Pasamos null como IP ya que SignalR no proporciona IP directamente de la misma forma
+			var ipAddress = Context.GetHttpContext()?.Connection?.RemoteIpAddress?.ToString();
+			var result = await _bidService.PlaceBidAsync(auctionGuid, userGuid, amount, ipAddress);
+
+			if (result.Success)
+			{
+				// Confirmar al pujador que su puja fue aceptada
+				await Clients.Caller.SendAsync("BidAccepted", result.Bid);
+
+				_logger.LogInformation(
+					"Puja aceptada vía SignalR: Usuario {UserId}, Subasta {AuctionId}, Monto {Amount}",
+					userId, auctionId, amount);
+
+				// Nota: La notificación NewBid a todos los participantes ya se hace en BidService.NotifyNewBidAsync
+			}
+			else
+			{
+				// Enviar error solo al que pujó
+				await Clients.Caller.SendAsync("BidError", result.ErrorMessage ?? "Error desconocido al procesar la puja.");
+
+				_logger.LogWarning(
+					"Puja rechazada vía SignalR: Usuario {UserId}, Subasta {AuctionId}, Monto {Amount}, Error: {Error}",
+					userId, auctionId, amount, result.ErrorMessage);
+			}
+		}
+		catch (Exception ex)
+		{
+			_logger.LogError(ex, "Error inesperado al procesar puja vía SignalR para subasta {AuctionId}", auctionId);
+			await Clients.Caller.SendAsync("BidError", "Error interno al procesar la puja. Inténtalo de nuevo.");
+		}
+	}
 
 	#endregion
 

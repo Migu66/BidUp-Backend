@@ -3,8 +3,11 @@ using Moq;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
+using System.Net;
 using BidUp.Api.Application.DTOs.Auction;
+using BidUp.Api.Domain.Interfaces;
 using BidUp.Api.Hubs;
 
 namespace BidUp.Tests.Hubs;
@@ -12,6 +15,7 @@ namespace BidUp.Tests.Hubs;
 public class AuctionHubTests
 {
 	private readonly Mock<ILogger<AuctionHub>> _mockLogger;
+	private readonly Mock<IBidService> _mockBidService;
 	private readonly Mock<HubCallerContext> _mockContext;
 	private readonly Mock<IHubCallerClients> _mockClients;
 	private readonly Mock<IGroupManager> _mockGroups;
@@ -21,12 +25,13 @@ public class AuctionHubTests
 	public AuctionHubTests()
 	{
 		_mockLogger = new Mock<ILogger<AuctionHub>>();
+		_mockBidService = new Mock<IBidService>();
 		_mockContext = new Mock<HubCallerContext>();
 		_mockClients = new Mock<IHubCallerClients>();
 		_mockGroups = new Mock<IGroupManager>();
 		_mockClientProxy = new Mock<ISingleClientProxy>();
 
-		_hub = new AuctionHub(_mockLogger.Object)
+		_hub = new AuctionHub(_mockLogger.Object, _mockBidService.Object)
 		{
 			Context = _mockContext.Object,
 			Clients = _mockClients.Object,
@@ -492,6 +497,308 @@ public class AuctionHubTests
 
 		_mockContext.Setup(c => c.User).Returns(principal);
 		_mockContext.Setup(c => c.ConnectionId).Returns(connectionId);
+	}
+
+	private void SetupHttpContext(string? ipAddress = "127.0.0.1")
+	{
+		var mockHttpContext = new Mock<HttpContext>();
+		var mockConnection = new Mock<ConnectionInfo>();
+
+		if (ipAddress != null)
+		{
+			mockConnection.Setup(c => c.RemoteIpAddress).Returns(IPAddress.Parse(ipAddress));
+		}
+
+		mockHttpContext.Setup(h => h.Connection).Returns(mockConnection.Object);
+		_mockContext.Setup(c => c.GetHttpContext()).Returns(mockHttpContext.Object);
+	}
+
+	#endregion
+
+	#region PlaceBid Tests
+
+	[Fact]
+	public async Task PlaceBid_WithUnauthenticatedUser_SendsBidError()
+	{
+		// Arrange
+		var connectionId = "test-connection-123";
+		var auctionId = Guid.NewGuid().ToString();
+		SetupUnauthenticatedUser(connectionId);
+
+		// Act
+		await _hub.PlaceBid(auctionId, 100);
+
+		// Assert
+		_mockClientProxy.Verify(
+			x => x.SendCoreAsync(
+				"BidError",
+				It.Is<object[]>(o => o.Length == 1 && o[0].ToString()!.Contains("No autenticado")),
+				default),
+			Times.Once);
+	}
+
+	[Fact]
+	public async Task PlaceBid_WithInvalidAuctionId_SendsBidError()
+	{
+		// Arrange
+		var userId = Guid.NewGuid().ToString();
+		var connectionId = "test-connection-123";
+		SetupAuthenticatedUser(userId, connectionId);
+		SetupHttpContext();
+
+		// Act
+		await _hub.PlaceBid("invalid-guid", 100);
+
+		// Assert
+		_mockClientProxy.Verify(
+			x => x.SendCoreAsync(
+				"BidError",
+				It.Is<object[]>(o => o.Length == 1 && o[0].ToString()!.Contains("ID de subasta inválido")),
+				default),
+			Times.Once);
+	}
+
+	[Fact]
+	public async Task PlaceBid_WithNegativeAmount_SendsBidError()
+	{
+		// Arrange
+		var userId = Guid.NewGuid().ToString();
+		var connectionId = "test-connection-123";
+		var auctionId = Guid.NewGuid().ToString();
+		SetupAuthenticatedUser(userId, connectionId);
+		SetupHttpContext();
+
+		// Act
+		await _hub.PlaceBid(auctionId, -50);
+
+		// Assert
+		_mockClientProxy.Verify(
+			x => x.SendCoreAsync(
+				"BidError",
+				It.Is<object[]>(o => o.Length == 1 && o[0].ToString()!.Contains("mayor a cero")),
+				default),
+			Times.Once);
+	}
+
+	[Fact]
+	public async Task PlaceBid_WithZeroAmount_SendsBidError()
+	{
+		// Arrange
+		var userId = Guid.NewGuid().ToString();
+		var connectionId = "test-connection-123";
+		var auctionId = Guid.NewGuid().ToString();
+		SetupAuthenticatedUser(userId, connectionId);
+		SetupHttpContext();
+
+		// Act
+		await _hub.PlaceBid(auctionId, 0);
+
+		// Assert
+		_mockClientProxy.Verify(
+			x => x.SendCoreAsync(
+				"BidError",
+				It.Is<object[]>(o => o.Length == 1 && o[0].ToString()!.Contains("mayor a cero")),
+				default),
+			Times.Once);
+	}
+
+	[Fact]
+	public async Task PlaceBid_WhenBidServiceSucceeds_SendsBidAccepted()
+	{
+		// Arrange
+		var userId = Guid.NewGuid();
+		var auctionId = Guid.NewGuid();
+		var connectionId = "test-connection-123";
+		var amount = 150m;
+
+		SetupAuthenticatedUser(userId.ToString(), connectionId);
+		SetupHttpContext();
+
+		var bidDto = new BidDto
+		{
+			Id = Guid.NewGuid(),
+			Amount = amount,
+			BidderId = userId,
+			BidderName = "Test User",
+			AuctionId = auctionId,
+			Timestamp = DateTime.UtcNow,
+			IsWinning = true
+		};
+
+		_mockBidService
+			.Setup(s => s.PlaceBidAsync(auctionId, userId, amount, It.IsAny<string?>()))
+			.ReturnsAsync(BidResult.Succeeded(bidDto, amount));
+
+		// Act
+		await _hub.PlaceBid(auctionId.ToString(), amount);
+
+		// Assert
+		_mockClientProxy.Verify(
+			x => x.SendCoreAsync(
+				"BidAccepted",
+				It.Is<object[]>(o => o.Length == 1 && o[0] == bidDto),
+				default),
+			Times.Once);
+	}
+
+	[Fact]
+	public async Task PlaceBid_WhenBidServiceFails_SendsBidError()
+	{
+		// Arrange
+		var userId = Guid.NewGuid();
+		var auctionId = Guid.NewGuid();
+		var connectionId = "test-connection-123";
+		var amount = 50m;
+		var errorMessage = "La puja mínima es $100.00";
+
+		SetupAuthenticatedUser(userId.ToString(), connectionId);
+		SetupHttpContext();
+
+		_mockBidService
+			.Setup(s => s.PlaceBidAsync(auctionId, userId, amount, It.IsAny<string?>()))
+			.ReturnsAsync(BidResult.Failed(errorMessage));
+
+		// Act
+		await _hub.PlaceBid(auctionId.ToString(), amount);
+
+		// Assert
+		_mockClientProxy.Verify(
+			x => x.SendCoreAsync(
+				"BidError",
+				It.Is<object[]>(o => o.Length == 1 && o[0].ToString() == errorMessage),
+				default),
+			Times.Once);
+	}
+
+	[Fact]
+	public async Task PlaceBid_WhenBidServiceThrowsException_SendsBidError()
+	{
+		// Arrange
+		var userId = Guid.NewGuid();
+		var auctionId = Guid.NewGuid();
+		var connectionId = "test-connection-123";
+		var amount = 100m;
+
+		SetupAuthenticatedUser(userId.ToString(), connectionId);
+		SetupHttpContext();
+
+		_mockBidService
+			.Setup(s => s.PlaceBidAsync(auctionId, userId, amount, It.IsAny<string?>()))
+			.ThrowsAsync(new Exception("Database error"));
+
+		// Act
+		await _hub.PlaceBid(auctionId.ToString(), amount);
+
+		// Assert
+		_mockClientProxy.Verify(
+			x => x.SendCoreAsync(
+				"BidError",
+				It.Is<object[]>(o => o.Length == 1 && o[0].ToString()!.Contains("Error interno")),
+				default),
+			Times.Once);
+	}
+
+	[Fact]
+	public async Task PlaceBid_CallsBidServiceWithCorrectParameters()
+	{
+		// Arrange
+		var userId = Guid.NewGuid();
+		var auctionId = Guid.NewGuid();
+		var connectionId = "test-connection-123";
+		var amount = 200m;
+		var ipAddress = "192.168.1.100";
+
+		SetupAuthenticatedUser(userId.ToString(), connectionId);
+		SetupHttpContext(ipAddress);
+
+		var bidDto = new BidDto
+		{
+			Id = Guid.NewGuid(),
+			Amount = amount,
+			BidderId = userId,
+			BidderName = "Test User",
+			AuctionId = auctionId
+		};
+
+		_mockBidService
+			.Setup(s => s.PlaceBidAsync(auctionId, userId, amount, ipAddress))
+			.ReturnsAsync(BidResult.Succeeded(bidDto, amount));
+
+		// Act
+		await _hub.PlaceBid(auctionId.ToString(), amount);
+
+		// Assert
+		_mockBidService.Verify(
+			s => s.PlaceBidAsync(auctionId, userId, amount, ipAddress),
+			Times.Once);
+	}
+
+	[Fact]
+	public async Task PlaceBid_LogsSuccessfulBid()
+	{
+		// Arrange
+		var userId = Guid.NewGuid();
+		var auctionId = Guid.NewGuid();
+		var connectionId = "test-connection-123";
+		var amount = 150m;
+
+		SetupAuthenticatedUser(userId.ToString(), connectionId);
+		SetupHttpContext();
+
+		var bidDto = new BidDto
+		{
+			Id = Guid.NewGuid(),
+			Amount = amount,
+			BidderId = userId,
+			AuctionId = auctionId
+		};
+
+		_mockBidService
+			.Setup(s => s.PlaceBidAsync(auctionId, userId, amount, It.IsAny<string?>()))
+			.ReturnsAsync(BidResult.Succeeded(bidDto, amount));
+
+		// Act
+		await _hub.PlaceBid(auctionId.ToString(), amount);
+
+		// Assert
+		_mockLogger.Verify(
+			x => x.Log(
+				LogLevel.Information,
+				It.IsAny<EventId>(),
+				It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Puja aceptada vía SignalR")),
+				null,
+				It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+			Times.Once);
+	}
+
+	[Fact]
+	public async Task PlaceBid_LogsRejectedBid()
+	{
+		// Arrange
+		var userId = Guid.NewGuid();
+		var auctionId = Guid.NewGuid();
+		var connectionId = "test-connection-123";
+		var amount = 50m;
+
+		SetupAuthenticatedUser(userId.ToString(), connectionId);
+		SetupHttpContext();
+
+		_mockBidService
+			.Setup(s => s.PlaceBidAsync(auctionId, userId, amount, It.IsAny<string?>()))
+			.ReturnsAsync(BidResult.Failed("Puja insuficiente"));
+
+		// Act
+		await _hub.PlaceBid(auctionId.ToString(), amount);
+
+		// Assert
+		_mockLogger.Verify(
+			x => x.Log(
+				LogLevel.Warning,
+				It.IsAny<EventId>(),
+				It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Puja rechazada vía SignalR")),
+				null,
+				It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+			Times.Once);
 	}
 
 	#endregion
