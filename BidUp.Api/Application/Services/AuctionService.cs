@@ -214,17 +214,21 @@ public class AuctionService : IAuctionService
 		return (await GetByIdAsync(auctionId))!;
 	}
 
-	public async Task<IEnumerable<BidDto>> GetAuctionBidsAsync(Guid auctionId, int page = 1, int pageSize = 50)
+	public async Task<(IEnumerable<BidDto> Bids, int TotalCount)> GetAuctionBidsAsync(Guid auctionId, int page = 1, int pageSize = 50)
 	{
-		var bids = await _context.Bids
+		var query = _context.Bids
+			.Where(b => b.AuctionId == auctionId);
+
+		var totalCount = await query.CountAsync();
+
+		var bids = await query
 			.Include(b => b.Bidder)
-			.Where(b => b.AuctionId == auctionId)
 			.OrderByDescending(b => b.Timestamp)
 			.Skip((page - 1) * pageSize)
 			.Take(pageSize)
 			.ToListAsync();
 
-		return bids.Select(b => new BidDto
+		var bidDtos = bids.Select(b => new BidDto
 		{
 			Id = b.Id,
 			Amount = b.Amount,
@@ -234,6 +238,8 @@ public class AuctionService : IAuctionService
 			BidderName = b.Bidder.FullName,
 			AuctionId = b.AuctionId
 		});
+
+		return (bidDtos, totalCount);
 	}
 
 	private AuctionDto MapToDto(Auction auction, int? totalBidsCount = null)

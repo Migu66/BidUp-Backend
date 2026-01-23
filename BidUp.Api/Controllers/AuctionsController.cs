@@ -276,18 +276,22 @@ public class AuctionsController : ControllerBase
 		Description = "Lista las pujas ordenadas por timestamp descendente.",
 		Tags = new[] { "Bids" })]
 	[HttpGet("{id:guid}/bids")]
-	[ProducesResponseType(typeof(ApiResponseDto<IEnumerable<BidDto>>), StatusCodes.Status200OK)]
-	public async Task<ActionResult<ApiResponseDto<IEnumerable<BidDto>>>> GetBids(
+	[ProducesResponseType(typeof(PaginatedResponseDto<BidDto>), StatusCodes.Status200OK)]
+	public async Task<ActionResult<PaginatedResponseDto<BidDto>>> GetBids(
 		Guid id,
 		[FromQuery] int page = 1,
 		[FromQuery] int pageSize = 50)
 	{
-		var bids = await _auctionService.GetAuctionBidsAsync(id, page, pageSize);
+		var (bids, totalCount) = await _auctionService.GetAuctionBidsAsync(id, page, pageSize);
+		var hasMore = page * pageSize < totalCount;
 
-		return Ok(new ApiResponseDto<IEnumerable<BidDto>>
+		return Ok(new PaginatedResponseDto<BidDto>
 		{
 			Success = true,
-			Data = bids
+			Data = bids,
+			TotalCount = totalCount,
+			HasMore = hasMore,
+			Message = "Pujas obtenidas correctamente"
 		});
 	}
 
