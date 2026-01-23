@@ -211,13 +211,16 @@ public class BidService : IBidService
 
 	private async Task NotifyNewBidAsync(Auction auction, BidDto bidDto, Guid? previousHighBidderId)
 	{
+		// Obtener el conteo real de pujas desde la BD
+		var totalBids = await _context.Bids.CountAsync(b => b.AuctionId == auction.Id);
+
 		// Notificar a todos los participantes de la subasta
 		var notification = new BidNotificationDto
 		{
 			AuctionId = auction.Id,
 			Bid = bidDto,
 			NewCurrentPrice = auction.CurrentPrice,
-			TotalBids = auction.Bids.Count + 1,
+			TotalBids = totalBids,
 			TimeRemaining = auction.TimeRemaining
 		};
 

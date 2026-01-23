@@ -49,7 +49,15 @@ public class AuctionService : IAuctionService
 			.Take(pageSize)
 			.ToListAsync();
 
-		return (auctions.Select(MapToDto), totalCount);
+		// Obtener conteos de pujas para todas las subastas en una sola query
+		var auctionIds = auctions.Select(a => a.Id).ToList();
+		var bidCounts = await _context.Bids
+			.Where(b => auctionIds.Contains(b.AuctionId))
+			.GroupBy(b => b.AuctionId)
+			.Select(g => new { AuctionId = g.Key, Count = g.Count() })
+			.ToDictionaryAsync(x => x.AuctionId, x => x.Count);
+
+		return (auctions.Select(a => MapToDto(a, bidCounts.GetValueOrDefault(a.Id, 0))), totalCount);
 	}
 
 	public async Task<(IEnumerable<AuctionDto> Auctions, int TotalCount)> GetAuctionsByCategoryAsync(Guid categoryId, int page = 1, int pageSize = 20)
@@ -69,7 +77,15 @@ public class AuctionService : IAuctionService
 			.Take(pageSize)
 			.ToListAsync();
 
-		return (auctions.Select(MapToDto), totalCount);
+		// Obtener conteos de pujas para todas las subastas en una sola query
+		var auctionIds = auctions.Select(a => a.Id).ToList();
+		var bidCounts = await _context.Bids
+			.Where(b => auctionIds.Contains(b.AuctionId))
+			.GroupBy(b => b.AuctionId)
+			.Select(g => new { AuctionId = g.Key, Count = g.Count() })
+			.ToDictionaryAsync(x => x.AuctionId, x => x.Count);
+
+		return (auctions.Select(a => MapToDto(a, bidCounts.GetValueOrDefault(a.Id, 0))), totalCount);
 	}
 
 	public async Task<IEnumerable<AuctionDto>> GetAuctionsBySellerAsync(Guid sellerId, int page = 1, int pageSize = 20)
@@ -85,7 +101,15 @@ public class AuctionService : IAuctionService
 			.Take(pageSize)
 			.ToListAsync();
 
-		return auctions.Select(MapToDto);
+		// Obtener conteos de pujas para todas las subastas en una sola query
+		var auctionIds = auctions.Select(a => a.Id).ToList();
+		var bidCounts = await _context.Bids
+			.Where(b => auctionIds.Contains(b.AuctionId))
+			.GroupBy(b => b.AuctionId)
+			.Select(g => new { AuctionId = g.Key, Count = g.Count() })
+			.ToDictionaryAsync(x => x.AuctionId, x => x.Count);
+
+		return auctions.Select(a => MapToDto(a, bidCounts.GetValueOrDefault(a.Id, 0)));
 	}
 
 	public async Task<AuctionDto> CreateAuctionAsync(CreateAuctionDto dto, Guid sellerId)
@@ -212,9 +236,12 @@ public class AuctionService : IAuctionService
 		});
 	}
 
-	private static AuctionDto MapToDto(Auction auction)
+	private AuctionDto MapToDto(Auction auction, int? totalBidsCount = null)
 	{
 		var latestBid = auction.Bids.FirstOrDefault();
+
+		// Si no se proporciona el conteo, obtenerlo de la BD (para llamadas individuales)
+		var totalBids = totalBidsCount ?? _context.Bids.Count(b => b.AuctionId == auction.Id);
 
 		return new AuctionDto
 		{
@@ -228,7 +255,7 @@ public class AuctionService : IAuctionService
 			StartTime = auction.StartTime,
 			EndTime = auction.EndTime,
 			Status = auction.Status.ToString(),
-			TotalBids = auction.Bids.Count,
+			TotalBids = totalBids,
 			TimeRemaining = auction.TimeRemaining,
 			SellerId = auction.SellerId,
 			SellerName = auction.Seller.FullName,
