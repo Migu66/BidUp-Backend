@@ -1,0 +1,71 @@
+## Build outputs
+bin/
+obj/
+out/
+TestResults/
+
+## Visual Studio files
+.vs/
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Rider/VS Code
+.idea/
+.vscode/
+*.iml
+
+## NuGet
+*.nupkg
+*.snupkg
+packages/
+*.nuget.props
+*.nuget.targets
+.nuget/
+
+## Logs and diagnostics
+*.log
+logs/
+*.svclog
+*.etl
+*.dump
+
+## Transient files
+*.tmp
+*.temp
+*.pid
+*.DS_Store
+Thumbs.db
+
+## Security / environment
+.env
+.env.local
+.env.*.local
+secrets.json
+appsettings.Local.json
+appsettings.Development.local.json
+local.settings.json
+
+## Coverage
+coverage/
+.coverage
+coverage.cobertura.xml
+*.coverage
+*.coveragexml
+
+## Publish profiles and artifacts
+*.pubxml
+*.publishsettings
+*.azurePubxml
+/obj/**/project.assets.json
+/obj/**/project.packages.json
+
+## Misc
+*.docstates
+_ReSharper*/
+stylecop-cache.json
+
+## Copilot
+.github/instructions/

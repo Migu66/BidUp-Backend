@@ -1,0 +1,51 @@
+## Source control
+.git
+.gitignore
+
+## Build output
+bin/
+obj/
+out/
+TestResults/
+
+## IDE files
+.vs/
+.vscode/
+.idea/
+*.user
+*.rsuser
+*.suo
+*.iml
+
+## Package caches
+packages/
+.nuget/
+
+## Logs and diagnostics
+logs/
+*.log
+*.svclog
+*.etl
+*.dump
+
+## Environment / config (exclude local secrets)
+.env
+.env.*
+appsettings.Development.json
+appsettings.Local.json
+local.settings.json
+secrets.json
+
+## Temporary and coverage
+*.tmp
+*.temp
+*.pid
+coverage/
+.coverage
+coverage.cobertura.xml
+*.coverage
+*.coveragexml
+
+## OS / tooling noise
+*.DS_Store
+Thumbs.db

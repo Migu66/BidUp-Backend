@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  bidup-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bidup-api
+    ports:
+      - "5001:443"
+      - "5000:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=your_password_here
+      - ConnectionStrings__DefaultConnection=Host=bidup-db;Database=bidupdb;Username=postgres;Password=postgres
+    volumes:
+      - ~/.aspnet/https:/https:ro
+    networks:
+      - bidup-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost/weatherforecast" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - bidup-db
+
+  bidup-db:
+    image: postgres:16-alpine
+    container_name: bidup-db
+    environment:
+      - POSTGRES_DB=bidupdb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - bidup-db-data:/var/lib/postgresql/data
+    networks:
+      - bidup-network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+networks:
+  bidup-network:
+    driver: bridge
+
+volumes:
+  bidup-db-data:
+    driver: local
