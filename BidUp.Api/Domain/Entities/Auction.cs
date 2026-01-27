@@ -24,7 +24,7 @@ public class Auction
 	public DateTime? UpdatedAt { get; set; }
 
 	// Estado
-	public AuctionStatus Status { get; set; } = AuctionStatus.Pending;
+	public AuctionStatus Status { get; set; } = AuctionStatus.Active;
 
 	// Relaciones
 	public Guid SellerId { get; set; }
