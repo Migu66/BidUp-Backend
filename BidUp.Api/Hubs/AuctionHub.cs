@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using BidUp.Api.Application.DTOs;
 using BidUp.Api.Application.DTOs.Auction;
 using BidUp.Api.Domain.Interfaces;
 using System.Security.Claims;
@@ -14,13 +15,16 @@ namespace BidUp.Api.Hubs;
 /// </summary>
 public class AuctionHub : Hub
 {
+	private static int _connectedUsersCount = 0;
 	private readonly ILogger<AuctionHub> _logger;
 	private readonly IBidService _bidService;
+	private readonly IAuctionService _auctionService;
 
-	public AuctionHub(ILogger<AuctionHub> logger, IBidService bidService)
+	public AuctionHub(ILogger<AuctionHub> logger, IBidService bidService, IAuctionService auctionService)
 	{
 		_logger = logger;
 		_bidService = bidService;
+		_auctionService = auctionService;
 	}
 
 	/// <summary>
@@ -39,12 +43,15 @@ public class AuctionHub : Hub
 	/// </summary>
 	public override async Task OnConnectedAsync()
 	{
+		Interlocked.Increment(ref _connectedUsersCount);
+		
 		var userId = GetUserId();
 		var connectionType = IsAuthenticated ? "Autenticado" : "Anónimo";
 
 		_logger.LogInformation("Cliente conectado: {ConnectionId}, Usuario: {UserId}, Tipo: {ConnectionType}",
 			Context.ConnectionId, userId ?? "Anónimo", connectionType);
 
+		await BroadcastLiveStats();
 		await base.OnConnectedAsync();
 	}
 
@@ -53,6 +60,8 @@ public class AuctionHub : Hub
 	/// </summary>
 	public override async Task OnDisconnectedAsync(Exception? exception)
 	{
+		Interlocked.Decrement(ref _connectedUsersCount);
+		
 		var userId = GetUserId();
 		_logger.LogInformation("Cliente desconectado: {ConnectionId}, Usuario: {UserId}",
 			Context.ConnectionId, userId ?? "Anónimo");
@@ -63,6 +72,7 @@ public class AuctionHub : Hub
 				Context.ConnectionId);
 		}
 
+		await BroadcastLiveStats();
 		await base.OnDisconnectedAsync(exception);
 	}
 
@@ -211,6 +221,21 @@ public class AuctionHub : Hub
 	}
 
 	#endregion
+
+	/// <summary>
+	/// Difundir estadísticas en vivo a todos los clientes conectados
+	/// </summary>
+	private async Task BroadcastLiveStats()
+	{
+		var activeAuctions = await _auctionService.GetActiveAuctionsCountAsync();
+
+		await Clients.All.SendAsync("LiveStatsUpdated", new LiveStatsDto
+		{
+			ActiveAuctions = activeAuctions,
+			ConnectedUsers = _connectedUsersCount,
+			Timestamp = DateTime.UtcNow
+		});
+	}
 
 	/// <summary>
 	/// Obtener el nombre del grupo para una subasta

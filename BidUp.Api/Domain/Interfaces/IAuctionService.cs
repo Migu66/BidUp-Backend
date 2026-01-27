@@ -12,4 +12,5 @@ public interface IAuctionService
 	Task<bool> CancelAuctionAsync(Guid auctionId, Guid sellerId);
 	Task<AuctionDto> ActivateAuctionAsync(Guid auctionId, Guid sellerId);
 	Task<(IEnumerable<BidDto> Bids, int TotalCount)> GetAuctionBidsAsync(Guid auctionId, int page = 1, int pageSize = 50);
+	Task<int> GetActiveAuctionsCountAsync();
 }

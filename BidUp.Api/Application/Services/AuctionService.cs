@@ -242,6 +242,13 @@ public class AuctionService : IAuctionService
 		return (bidDtos, totalCount);
 	}
 
+	public async Task<int> GetActiveAuctionsCountAsync()
+	{
+		return await _context.Auctions
+			.Where(a => a.Status == AuctionStatus.Active)
+			.CountAsync();
+	}
+
 	private AuctionDto MapToDto(Auction auction, int? totalBidsCount = null)
 	{
 		var latestBid = auction.Bids.FirstOrDefault();
