@@ -145,7 +145,7 @@ public class AuctionService : IAuctionService
 			EndTime = dto.EndTime,
 			SellerId = sellerId,
 			CategoryId = dto.CategoryId,
-			Status = dto.StartTime <= DateTime.UtcNow ? AuctionStatus.Active : AuctionStatus.Pending,
+			Status = AuctionStatus.Active,
 			CreatedAt = DateTime.UtcNow
 		};
 
