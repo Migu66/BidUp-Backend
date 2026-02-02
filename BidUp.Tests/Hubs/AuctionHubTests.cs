@@ -16,6 +16,7 @@ public class AuctionHubTests
 {
 	private readonly Mock<ILogger<AuctionHub>> _mockLogger;
 	private readonly Mock<IBidService> _mockBidService;
+	private readonly Mock<IAuctionService> _mockAuctionService;
 	private readonly Mock<HubCallerContext> _mockContext;
 	private readonly Mock<IHubCallerClients> _mockClients;
 	private readonly Mock<IGroupManager> _mockGroups;
@@ -26,12 +27,13 @@ public class AuctionHubTests
 	{
 		_mockLogger = new Mock<ILogger<AuctionHub>>();
 		_mockBidService = new Mock<IBidService>();
+		_mockAuctionService = new Mock<IAuctionService>();
 		_mockContext = new Mock<HubCallerContext>();
 		_mockClients = new Mock<IHubCallerClients>();
 		_mockGroups = new Mock<IGroupManager>();
 		_mockClientProxy = new Mock<ISingleClientProxy>();
 
-		_hub = new AuctionHub(_mockLogger.Object, _mockBidService.Object)
+		_hub = new AuctionHub(_mockLogger.Object, _mockBidService.Object, _mockAuctionService.Object)
 		{
 			Context = _mockContext.Object,
 			Clients = _mockClients.Object,

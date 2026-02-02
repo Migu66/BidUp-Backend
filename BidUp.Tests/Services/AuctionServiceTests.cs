@@ -130,8 +130,8 @@ public class AuctionServiceTests
 		var result = await _auctionService.GetActiveAuctionsAsync();
 
 		// Assert
-		result.Should().HaveCount(1);
-		result.First().Title.Should().Be("Active Auction");
+		result.Auctions.Should().HaveCount(1);
+		result.Auctions.First().Title.Should().Be("Active Auction");
 	}
 
 	[Fact]
@@ -157,8 +157,8 @@ public class AuctionServiceTests
 		var result = await _auctionService.GetActiveAuctionsAsync();
 
 		// Assert
-		result.Should().HaveCount(3);
-		var auctionList = result.ToList();
+		result.Auctions.Should().HaveCount(3);
+		var auctionList = result.Auctions.ToList();
 		auctionList[0].Title.Should().Be("Auction 2"); // Termina primero
 		auctionList[1].Title.Should().Be("Auction 3");
 		auctionList[2].Title.Should().Be("Auction 1"); // Termina último
@@ -187,8 +187,8 @@ public class AuctionServiceTests
 		var page2 = await _auctionService.GetActiveAuctionsAsync(page: 2, pageSize: 10);
 
 		// Assert
-		page1.Should().HaveCount(10);
-		page2.Should().HaveCount(10);
+		page1.Auctions.Should().HaveCount(10);
+		page2.Auctions.Should().HaveCount(10);
 	}
 
 	[Fact]
@@ -212,8 +212,8 @@ public class AuctionServiceTests
 		var result = await _auctionService.GetActiveAuctionsAsync();
 
 		// Assert
-		result.Should().HaveCount(1);
-		result.First().Title.Should().Be("Active");
+		result.Auctions.Should().HaveCount(1);
+		result.Auctions.First().Title.Should().Be("Active");
 	}
 
 	#endregion
@@ -241,10 +241,10 @@ public class AuctionServiceTests
 		var result = await _auctionService.GetAuctionsByCategoryAsync(category1.Id);
 
 		// Assert
-		result.Should().HaveCount(2);
-		result.Should().Contain(a => a.Title == "Laptop");
-		result.Should().Contain(a => a.Title == "Phone");
-		result.Should().NotContain(a => a.Title == "Shirt");
+		result.Auctions.Should().HaveCount(2);
+		result.Auctions.Should().Contain(a => a.Title == "Laptop");
+		result.Auctions.Should().Contain(a => a.Title == "Phone");
+		result.Auctions.Should().NotContain(a => a.Title == "Shirt");
 	}
 
 	[Fact]
@@ -266,8 +266,8 @@ public class AuctionServiceTests
 		var result = await _auctionService.GetAuctionsByCategoryAsync(category.Id);
 
 		// Assert
-		result.Should().HaveCount(1);
-		result.First().Title.Should().Be("Active");
+		result.Auctions.Should().HaveCount(1);
+		result.Auctions.First().Title.Should().Be("Active");
 	}
 
 	#endregion
@@ -625,8 +625,8 @@ public class AuctionServiceTests
 		var result = await _auctionService.GetAuctionBidsAsync(auction.Id);
 
 		// Assert
-		result.Should().HaveCount(2);
-		var bidList = result.ToList();
+		result.Bids.Should().HaveCount(2);
+		var bidList = result.Bids.ToList();
 		bidList[0].Amount.Should().Be(120); // Más reciente primero
 		bidList[1].Amount.Should().Be(110);
 	}
@@ -663,8 +663,8 @@ public class AuctionServiceTests
 		var result = await _auctionService.GetAuctionBidsAsync(auction.Id);
 
 		// Assert
-		result.Should().HaveCount(5);
-		var bidList = result.ToList();
+		result.Bids.Should().HaveCount(5);
+		var bidList = result.Bids.ToList();
 		bidList[0].Amount.Should().Be(110); // Más reciente
 		bidList[4].Amount.Should().Be(150); // Más antiguo
 	}

@@ -43,7 +43,7 @@ public class AuctionsControllerTests
 		};
 
 		_mockAuctionService.Setup(x => x.GetActiveAuctionsAsync(1, 20))
-			.ReturnsAsync(auctions);
+			.ReturnsAsync((auctions, auctions.Count));
 
 		// Act
 		var result = await _controller.GetActiveAuctions();
@@ -62,7 +62,7 @@ public class AuctionsControllerTests
 		// Arrange
 		var auctions = new List<AuctionDto>();
 		_mockAuctionService.Setup(x => x.GetActiveAuctionsAsync(2, 10))
-			.ReturnsAsync(auctions);
+			.ReturnsAsync((auctions, 0));
 
 		// Act
 		await _controller.GetActiveAuctions(page: 2, pageSize: 10);
@@ -131,7 +131,7 @@ public class AuctionsControllerTests
 		};
 
 		_mockAuctionService.Setup(x => x.GetAuctionsByCategoryAsync(categoryId, 1, 20))
-			.ReturnsAsync(auctions);
+			.ReturnsAsync((auctions, auctions.Count));
 
 		// Act
 		var result = await _controller.GetByCategory(categoryId);
@@ -356,7 +356,7 @@ public class AuctionsControllerTests
 		};
 
 		_mockAuctionService.Setup(x => x.GetAuctionBidsAsync(auctionId, 1, 50))
-			.ReturnsAsync(bids);
+			.ReturnsAsync((bids, bids.Count));
 
 		// Act
 		var result = await _controller.GetBids(auctionId);
